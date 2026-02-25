@@ -1,0 +1,472 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Editor — Content Admin</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link href="css/styles.css" rel="stylesheet">
+</head>
+<body>
+  <!-- Navbar -->
+  <nav class="app-navbar">
+    <a href="dashboard.html" class="brand"><div class="brand-icon">CA</div> Content Admin</a>
+    <div class="nav-actions">
+      <a href="dashboard.html" class="nav-link-custom">Dashboard</a>
+      <a href="editor.html" class="nav-link-custom active">Editor</a>
+      <button onclick="Auth.logout()" class="btn btn-sm btn-outline-secondary">Logout</button>
+    </div>
+  </nav>
+
+  <!-- Editor Layout -->
+  <div class="editor-layout">
+    <!-- Tree Sidebar -->
+    <div class="tree-sidebar">
+      <div class="tree-header">
+        <h5>
+          Content Tree
+          <button class="btn btn-sm btn-primary" onclick="showAddRootModal()" title="Add root item">
+            <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg>
+          </button>
+        </h5>
+        <div class="tree-search">
+          <svg class="search-icon" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
+          <input type="text" id="treeSearch" placeholder="Search content..." oninput="filterTree(this.value)">
+        </div>
+      </div>
+      <div class="tree-content" id="treeContainer">
+        <div class="text-center text-muted py-4"><div class="spinner-border spinner-border-sm"></div><br><small>Loading tree...</small></div>
+      </div>
+    </div>
+
+    <!-- Editor Pane -->
+    <div class="editor-pane">
+      <div class="editor-empty" id="editorEmpty">
+        <svg width="64" height="64" fill="none" stroke="currentColor" stroke-width="1" viewBox="0 0 24 24"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+        <h5>Select a content item</h5>
+        <p class="text-muted" style="max-width:300px">Click on any item in the tree to edit its details and translations.</p>
+      </div>
+
+      <div id="editorContent" style="display:none;">
+        <div class="editor-header">
+          <div class="editor-breadcrumb" id="editorBreadcrumb"></div>
+          <div class="d-flex gap-2">
+            <button class="btn btn-sm btn-outline-primary" onclick="openPreview()">Preview</button>
+            <button class="btn btn-sm btn-outline-danger" onclick="deleteSelectedContent()">Delete</button>
+          </div>
+        </div>
+
+        <div class="editor-tabs" id="editorTabs">
+          <button class="editor-tab active" data-tab="structure" onclick="switchTab('structure')">Structure</button>
+          <button class="editor-tab" data-tab="en" onclick="switchTab('en')">English</button>
+          <button class="editor-tab" data-tab="gu" onclick="switchTab('gu')">Gujarati</button>
+          <button class="editor-tab" data-tab="ar" onclick="switchTab('ar')">Arabic</button>
+          <button class="editor-tab" data-tab="ur" onclick="switchTab('ur')">Urdu</button>
+        </div>
+
+        <div class="editor-body">
+          <!-- Structure Tab -->
+          <div class="editor-tab-content active" id="tab-structure">
+            <div class="form-section">
+              <h6>Content Properties</h6>
+              <div class="row g-3">
+                <div class="col-md-6">
+                  <label class="form-label-custom">Content Type</label>
+                  <select id="fieldType" class="form-select">
+                    <option value="category">Category</option>
+                    <option value="content">Content</option>
+                    <option value="section">Section</option>
+                    <option value="item">Item</option>
+                  </select>
+                </div>
+                <div class="col-md-6">
+                  <label class="form-label-custom">Parent</label>
+                  <select id="fieldParent" class="form-select"><option value="">Root (no parent)</option></select>
+                </div>
+                <div class="col-md-6">
+                  <label class="form-label-custom">Sequence</label>
+                  <input type="number" id="fieldSequence" class="form-control" min="0" value="0">
+                </div>
+                <div class="col-md-6">
+                  <label class="form-label-custom">Content ID</label>
+                  <input type="text" id="fieldId" class="form-control" readonly disabled style="background:#f8fafc;">
+                </div>
+              </div>
+            </div>
+            <div class="form-section">
+              <h6>Media & Styling</h6>
+              <div class="row g-3">
+                <div class="col-md-6"><label class="form-label-custom">Audio URL</label><input type="url" id="fieldAudioUrl" class="form-control" placeholder="https://..."></div>
+                <div class="col-md-6"><label class="form-label-custom">Video URL</label><input type="url" id="fieldVideoUrl" class="form-control" placeholder="https://..."></div>
+                <div class="col-md-6"><label class="form-label-custom">Duas URL</label><input type="url" id="fieldDuasUrl" class="form-control" placeholder="https://..."></div>
+                <div class="col-md-6"><label class="form-label-custom">Custom CSS</label><input type="text" id="fieldCss" class="form-control" placeholder="e.g., font-size:18px;"></div>
+              </div>
+            </div>
+            <button class="btn btn-primary" id="saveStructureBtn" onclick="saveStructure()">Save Structure</button>
+          </div>
+
+          <!-- Language tabs — generated with a helper to reduce repetition -->
+          <div class="editor-tab-content" id="tab-en"></div>
+          <div class="editor-tab-content" id="tab-gu"></div>
+          <div class="editor-tab-content" id="tab-ar"></div>
+          <div class="editor-tab-content" id="tab-ur"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Add Content Modal -->
+  <div class="modal fade" id="addContentModal" tabindex="-1">
+    <div class="modal-dialog modal-dialog-centered">
+      <div class="modal-content">
+        <div class="modal-header"><h5 class="modal-title" id="addModalTitle">Add Content</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+        <div class="modal-body">
+          <div class="mb-3">
+            <label class="form-label-custom">Content Type</label>
+            <select id="addType" class="form-select">
+              <option value="category">Category</option><option value="content">Content</option>
+              <option value="section">Section</option><option value="item">Item</option>
+            </select>
+          </div>
+          <input type="hidden" id="addParentId" value="">
+        </div>
+        <div class="modal-footer">
+          <button class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+          <button class="btn btn-primary" id="addContentBtn" onclick="handleAddContent()">Add</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/bcryptjs@2.4.3/dist/bcrypt.min.js"></script>
+  <script src="js/db.js"></script>
+  <script src="js/auth.js"></script>
+  <script src="js/api.js"></script>
+  <script src="js/utils.js"></script>
+  <script>
+    if (!Auth.requireLogin()) throw new Error("Not authenticated");
+
+    /* ── State ── */
+    let allContent = [];
+    let selectedId = null;
+    let expandedNodes = new Set();
+    let currentTranslations = {};
+    let draggedId = null;
+
+    /* ── Generate language tab HTML ── */
+    const LANGS = [
+      { code: "en", name: "English", rtl: false, phTitle: "Enter title..." },
+      { code: "gu", name: "Gujarati", rtl: false, phTitle: "શીર્ષક દાખલ કરો..." },
+      { code: "ar", name: "Arabic", rtl: true, phTitle: "...أدخل العنوان" },
+      { code: "ur", name: "Urdu", rtl: true, phTitle: "...عنوان درج کریں" },
+    ];
+
+    for (const lang of LANGS) {
+      const dir = lang.rtl ? 'dir="rtl"' : '';
+      const cls = lang.rtl ? 'rtl-text' : '';
+      document.getElementById(`tab-${lang.code}`).innerHTML = `
+        <div class="form-section">
+          <h6>${lang.name} Translation</h6>
+          <div class="row g-3">
+            <div class="col-12"><label class="form-label-custom">Title</label><input type="text" id="${lang.code}-title" class="form-control ${cls}" placeholder="${lang.phTitle}" ${dir}></div>
+            <div class="col-12"><label class="form-label-custom">Original Text</label><textarea id="${lang.code}-original_text" class="form-control ${cls}" rows="4" ${dir}></textarea></div>
+            <div class="col-12"><label class="form-label-custom">Translation</label><textarea id="${lang.code}-translation" class="form-control ${cls}" rows="4" ${dir}></textarea></div>
+            <div class="col-12"><label class="form-label-custom">Transliteration</label><textarea id="${lang.code}-transliteration" class="form-control" rows="3"></textarea></div>
+            <div class="col-12"><label class="form-label-custom">Search Text</label><input type="text" id="${lang.code}-search_text" class="form-control ${cls}" ${dir}></div>
+          </div>
+        </div>
+        <button class="btn btn-primary" onclick="saveTranslation('${lang.code}')">Save ${lang.name}</button>`;
+    }
+
+    /* ── Tree ── */
+    loadTree();
+
+    async function loadTree() {
+      try {
+        const data = await API.getTree();
+        allContent = data.rows || [];
+        // Load English labels
+        try {
+          const labeled = await API.getTree("with-language", "en");
+          const labelMap = {};
+          for (const r of (labeled.rows || [])) if (r.title) labelMap[r.id] = r.title;
+          for (const item of allContent) if (labelMap[item.id]) item._label = labelMap[item.id];
+        } catch {}
+        renderTree();
+        populateParentDropdown();
+      } catch (err) { Toast.error("Failed to load content tree."); }
+    }
+
+    function renderTree() {
+      const c = document.getElementById("treeContainer");
+      const search = (document.getElementById("treeSearch")?.value || "").toLowerCase();
+      const roots = allContent.filter((r) => r.parent_id === null || r.parent_id === undefined)
+        .sort((a, b) => (a.sequence || 0) - (b.sequence || 0));
+
+      if (roots.length === 0) {
+        c.innerHTML = '<div class="empty-state"><h5 style="font-size:0.9375rem;">No content yet</h5><p style="font-size:0.8125rem;">Click + to add your first item.</p></div>';
+        return;
+      }
+      c.innerHTML = roots.map((item) => renderNode(item, search)).join("");
+    }
+
+    function renderNode(item, search) {
+      const children = allContent.filter((c) => Number(c.parent_id) === Number(item.id)).sort((a, b) => (a.sequence || 0) - (b.sequence || 0));
+      const hasKids = children.length > 0;
+      const expanded = expandedNodes.has(Number(item.id));
+      const selected = selectedId === Number(item.id);
+      const label = item._label || `${item.type || "item"} #${item.id}`;
+
+      if (search) {
+        const match = label.toLowerCase().includes(search) || (item.type || "").toLowerCase().includes(search) || String(item.id).includes(search);
+        const childMatch = children.some((c) => nodeMatches(c, search));
+        if (!match && !childMatch) return "";
+      }
+
+      const icons = {
+        category: '<svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>',
+        content: '<svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>',
+        section: '<svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M4 6h16M4 10h16M4 14h16M4 18h16"/></svg>',
+        item: '<svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4M12 8h.01"/></svg>',
+      };
+
+      let h = `<div class="tree-node" data-id="${item.id}">`;
+      h += `<div class="tree-node-row ${selected ? "selected" : ""}" onclick="selectNode(${item.id})" draggable="true" ondragstart="onDragStart(event,${item.id})" ondragover="onDragOver(event)" ondrop="onDrop(event,${item.id})" data-id="${item.id}">`;
+      h += `<button class="tree-toggle ${expanded ? "expanded" : ""} ${!hasKids ? "no-children" : ""}" onclick="event.stopPropagation();toggleNode(${item.id})"><svg width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><polyline points="9 18 15 12 9 6"/></svg></button>`;
+      h += `<span class="tree-node-icon">${icons[item.type] || icons.item}</span>`;
+      h += `<span class="tree-node-label">${esc(label)}</span>`;
+      h += `<span class="tree-node-badge type-${item.type || 'default'}">${item.type || "item"}</span>`;
+      h += `<div class="tree-node-actions">
+        <button onclick="event.stopPropagation();showAddChildModal(${item.id})" title="Add child"><svg width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg></button>
+        <button class="btn-delete" onclick="event.stopPropagation();deleteNode(${item.id})" title="Delete"><svg width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M3 6h18M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg></button>
+      </div></div>`;
+
+      if (hasKids && expanded) {
+        h += `<div class="tree-children">${children.map((c) => renderNode(c, search)).join("")}</div>`;
+      }
+      h += "</div>";
+      return h;
+    }
+
+    function nodeMatches(node, s) {
+      const label = node._label || `${node.type} #${node.id}`;
+      if (label.toLowerCase().includes(s) || (node.type || "").toLowerCase().includes(s)) return true;
+      return allContent.filter((c) => Number(c.parent_id) === Number(node.id)).some((c) => nodeMatches(c, s));
+    }
+
+    function toggleNode(id) { expandedNodes.has(id) ? expandedNodes.delete(id) : expandedNodes.add(id); renderTree(); }
+    function filterTree(v) { if (v) allContent.forEach((c) => expandedNodes.add(Number(c.id))); renderTree(); }
+
+    function populateParentDropdown() {
+      const sel = document.getElementById("fieldParent");
+      sel.innerHTML = '<option value="">Root (no parent)</option>';
+      for (const item of allContent) {
+        const label = item._label || `${item.type} #${item.id}`;
+        sel.innerHTML += `<option value="${item.id}">${"—".repeat(getDepth(item))} ${esc(label)}</option>`;
+      }
+    }
+
+    function getDepth(item) {
+      let d = 0, cur = item;
+      while (cur.parent_id) { d++; cur = allContent.find((c) => Number(c.id) === Number(cur.parent_id)); if (!cur || d > 20) break; }
+      return d;
+    }
+
+    function getBreadcrumb(id) {
+      const parts = [];
+      let cur = allContent.find((c) => Number(c.id) === Number(id));
+      while (cur) { parts.unshift(cur._label || `${cur.type} #${cur.id}`); if (!cur.parent_id) break; cur = allContent.find((c) => Number(c.id) === Number(cur.parent_id)); }
+      return parts;
+    }
+
+    /* ── Selection & Editor ── */
+    async function selectNode(id) {
+      selectedId = Number(id);
+      renderTree();
+      const item = allContent.find((c) => Number(c.id) === selectedId);
+      if (!item) return;
+
+      document.getElementById("editorEmpty").style.display = "none";
+      document.getElementById("editorContent").style.display = "";
+
+      const crumbs = getBreadcrumb(id);
+      document.getElementById("editorBreadcrumb").innerHTML = crumbs.map((c, i) =>
+        i === crumbs.length - 1 ? `<span>${esc(c)}</span>` : `${esc(c)} <svg width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><polyline points="9 18 15 12 9 6"/></svg>`
+      ).join(" ");
+
+      document.getElementById("fieldId").value = item.id;
+      document.getElementById("fieldType").value = item.type || "category";
+      document.getElementById("fieldParent").value = item.parent_id || "";
+      document.getElementById("fieldSequence").value = item.sequence || 0;
+      document.getElementById("fieldAudioUrl").value = item.audio_url || "";
+      document.getElementById("fieldVideoUrl").value = item.video_url || "";
+      document.getElementById("fieldDuasUrl").value = item.duas_url || "";
+      document.getElementById("fieldCss").value = item.css || "";
+
+      await loadTranslations(id);
+      switchTab("structure");
+    }
+
+    async function loadTranslations(contentId) {
+      try {
+        const data = await API.getTranslations(contentId);
+        currentTranslations = data.translations || {};
+        const fields = ["title", "transliteration", "translation", "original_text", "search_text"];
+        for (const lang of LANGS) {
+          const trans = currentTranslations[lang.code] || {};
+          for (const f of fields) {
+            const el = document.getElementById(`${lang.code}-${f}`);
+            if (el) el.value = trans[f] || "";
+          }
+        }
+      } catch (err) { Toast.error("Failed to load translations."); }
+    }
+
+    function switchTab(tabId) {
+      document.querySelectorAll(".editor-tab").forEach((t) => t.classList.toggle("active", t.dataset.tab === tabId));
+      document.querySelectorAll(".editor-tab-content").forEach((tc) => tc.classList.toggle("active", tc.id === `tab-${tabId}`));
+    }
+
+    /* ── Save ── */
+    async function saveStructure() {
+      if (!selectedId) return;
+      const btn = document.getElementById("saveStructureBtn");
+      Loading.start(btn, "Saving...");
+      try {
+        await API.updateContent({
+          id: selectedId,
+          type: document.getElementById("fieldType").value,
+          parent_id: document.getElementById("fieldParent").value || null,
+          sequence: parseInt(document.getElementById("fieldSequence").value) || 0,
+          audio_url: document.getElementById("fieldAudioUrl").value || null,
+          video_url: document.getElementById("fieldVideoUrl").value || null,
+          duas_url: document.getElementById("fieldDuasUrl").value || null,
+          css: document.getElementById("fieldCss").value || null,
+        });
+        Toast.success("Structure saved!");
+        await loadTree();
+        selectNode(selectedId);
+      } catch (err) { Toast.error(err.message); }
+      finally { Loading.stop(btn); }
+    }
+
+    async function saveTranslation(lang) {
+      if (!selectedId) return;
+      const btn = event.target.closest("button");
+      Loading.start(btn, "Saving...");
+      try {
+        const data = {
+          content_id: selectedId, language_code: lang,
+          title: document.getElementById(`${lang}-title`).value,
+          transliteration: document.getElementById(`${lang}-transliteration`).value,
+          translation: document.getElementById(`${lang}-translation`).value,
+          original_text: document.getElementById(`${lang}-original_text`).value,
+          search_text: document.getElementById(`${lang}-search_text`).value,
+        };
+        await API.saveTranslation(data);
+        const langName = LANGS.find((l) => l.code === lang)?.name || lang;
+        Toast.success(`${langName} translation saved!`);
+        if (lang === "en" && data.title) {
+          const item = allContent.find((c) => Number(c.id) === selectedId);
+          if (item) item._label = data.title;
+          renderTree();
+        }
+      } catch (err) { Toast.error(err.message); }
+      finally { Loading.stop(btn); }
+    }
+
+    /* ── Add / Delete ── */
+    function showAddRootModal() {
+      document.getElementById("addModalTitle").textContent = "Add Root Content";
+      document.getElementById("addParentId").value = "";
+      document.getElementById("addType").value = "category";
+      new bootstrap.Modal(document.getElementById("addContentModal")).show();
+    }
+    function showAddChildModal(parentId) {
+      const p = allContent.find((c) => Number(c.id) === parentId);
+      document.getElementById("addModalTitle").textContent = `Add Child to ${p?._label || "#" + parentId}`;
+      document.getElementById("addParentId").value = parentId;
+      document.getElementById("addType").value = "content";
+      new bootstrap.Modal(document.getElementById("addContentModal")).show();
+    }
+
+    async function handleAddContent() {
+      const btn = document.getElementById("addContentBtn");
+      const parentId = document.getElementById("addParentId").value || null;
+      const type = document.getElementById("addType").value;
+      Loading.start(btn, "Adding...");
+      try {
+        const result = await API.createContent({ parent_id: parentId ? Number(parentId) : null, type });
+        Toast.success("Content created!");
+        bootstrap.Modal.getInstance(document.getElementById("addContentModal"))?.hide();
+        if (parentId) expandedNodes.add(Number(parentId));
+        await loadTree();
+        if (result.id) selectNode(result.id);
+      } catch (err) { Toast.error(err.message); }
+      finally { Loading.stop(btn); }
+    }
+
+    async function deleteNode(id) {
+      const item = allContent.find((c) => Number(c.id) === Number(id));
+      const label = item?._label || `#${id}`;
+      if (!await confirmAction("Delete Content", `Delete <strong>"${esc(label)}"</strong> and all children? (soft-delete)`, "Delete", "btn-danger")) return;
+      try {
+        await API.deleteContent(id);
+        Toast.success(`"${label}" deleted.`);
+        if (selectedId === Number(id)) { selectedId = null; document.getElementById("editorEmpty").style.display = ""; document.getElementById("editorContent").style.display = "none"; }
+        await loadTree();
+      } catch (err) { Toast.error(err.message); }
+    }
+    function deleteSelectedContent() { if (selectedId) deleteNode(selectedId); }
+
+    /* ── Drag & Drop ── */
+    function onDragStart(e, id) { draggedId = id; e.dataTransfer.effectAllowed = "move"; e.target.closest(".tree-node-row")?.classList.add("dragging"); }
+    function onDragOver(e) { e.preventDefault(); document.querySelectorAll(".drag-over").forEach((el) => el.classList.remove("drag-over")); e.target.closest(".tree-node-row")?.classList.add("drag-over"); }
+
+    async function onDrop(e, targetId) {
+      e.preventDefault();
+      document.querySelectorAll(".dragging,.drag-over").forEach((el) => el.classList.remove("dragging", "drag-over"));
+      if (!draggedId || draggedId === targetId) return;
+      const dragged = allContent.find((c) => Number(c.id) === draggedId);
+      const target = allContent.find((c) => Number(c.id) === targetId);
+      if (!dragged || !target) return;
+
+      if (String(dragged.parent_id) === String(target.parent_id) || (dragged.parent_id == null && target.parent_id == null)) {
+        const pid = dragged.parent_id;
+        const siblings = allContent.filter((c) => pid == null ? (c.parent_id == null) : Number(c.parent_id) === Number(pid)).sort((a, b) => (a.sequence || 0) - (b.sequence || 0));
+        const ids = siblings.map((s) => Number(s.id));
+        const from = ids.indexOf(draggedId); const to = ids.indexOf(targetId);
+        ids.splice(from, 1); ids.splice(to, 0, draggedId);
+        try { await API.reorderContent(pid, ids); Toast.success("Reordered!"); await loadTree(); } catch (err) { Toast.error(err.message); }
+      } else {
+        try { await API.updateContent({ id: draggedId, parent_id: targetId }); expandedNodes.add(targetId); Toast.success("Moved!"); await loadTree(); } catch (err) { Toast.error(err.message); }
+      }
+      draggedId = null;
+    }
+
+    /* ── Preview ── */
+    function openPreview() {
+      if (!selectedId) return;
+      const tab = document.querySelector(".editor-tab.active")?.dataset.tab;
+      const lang = tab && tab !== "structure" ? tab : "en";
+      window.open(`preview.html?content_id=${selectedId}&lang=${lang}`, "_blank");
+    }
+
+    /* ── Utilities ── */
+    function esc(str) { if (!str) return ""; const d = document.createElement("div"); d.textContent = str; return d.innerHTML; }
+
+    // Ctrl+S to save current tab
+    document.addEventListener("keydown", (e) => {
+      if ((e.ctrlKey || e.metaKey) && e.key === "s") {
+        e.preventDefault();
+        if (!selectedId) return;
+        const tab = document.querySelector(".editor-tab.active")?.dataset.tab;
+        if (tab === "structure") saveStructure();
+        else if (tab) saveTranslation(tab);
+      }
+    });
+  </script>
+</body>
+</html>

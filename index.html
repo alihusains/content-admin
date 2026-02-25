@@ -1,0 +1,162 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Login — Content Admin</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link href="css/styles.css" rel="stylesheet">
+</head>
+<body>
+  <div class="login-wrapper">
+    <div class="login-card">
+      <div class="logo">CA</div>
+      <h1>Welcome Back</h1>
+      <p class="subtitle">Sign in to Content Admin</p>
+
+      <!-- Step 1: Database Setup (shown on first visit) -->
+      <div id="setupSection" style="display:none;">
+        <div class="alert alert-info py-2 px-3" style="font-size:0.8125rem;">
+          First-time setup: enter your Turso database credentials below.
+        </div>
+        <form id="setupForm" onsubmit="handleSetup(event)" novalidate>
+          <div class="mb-3">
+            <label class="form-label-custom">Turso Database URL</label>
+            <input type="text" id="tursoUrl" class="form-control" placeholder="libsql://your-db.turso.io" required>
+            <div class="form-text" style="font-size:0.75rem;">From your Turso dashboard</div>
+          </div>
+          <div class="mb-3">
+            <label class="form-label-custom">Turso Auth Token</label>
+            <input type="password" id="tursoToken" class="form-control" placeholder="eyJ..." required>
+          </div>
+          <div id="setupError" class="alert alert-danger d-none py-2 px-3" style="font-size:0.875rem;"></div>
+          <button type="submit" id="setupBtn" class="btn btn-primary w-100 py-2 fw-semibold">
+            Connect Database
+          </button>
+        </form>
+      </div>
+
+      <!-- Step 2: Login (shown after DB is configured) -->
+      <div id="loginSection" style="display:none;">
+        <form id="loginForm" onsubmit="handleLogin(event)" novalidate>
+          <div class="mb-3">
+            <label for="email" class="form-label-custom">Email Address</label>
+            <input type="email" id="email" class="form-control" placeholder="admin@example.com"
+                   required autocomplete="email" autofocus>
+          </div>
+          <div class="mb-4">
+            <label for="password" class="form-label-custom">Password</label>
+            <div class="position-relative">
+              <input type="password" id="password" class="form-control" placeholder="Enter your password"
+                     required autocomplete="current-password">
+              <button type="button" class="btn btn-sm position-absolute top-50 end-0 translate-middle-y me-2 p-0 border-0 bg-transparent"
+                      onclick="togglePassword()" tabindex="-1">
+                <svg id="eyeIcon" width="18" height="18" fill="none" stroke="#64748b" stroke-width="2" viewBox="0 0 24 24">
+                  <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
+                  <circle cx="12" cy="12" r="3"></circle>
+                </svg>
+              </button>
+            </div>
+          </div>
+          <div id="loginError" class="alert alert-danger d-none py-2 px-3" style="font-size:0.875rem;"></div>
+          <button type="submit" id="loginBtn" class="btn btn-primary w-100 py-2 fw-semibold">Sign In</button>
+        </form>
+
+        <div class="text-center mt-3">
+          <button class="btn btn-link btn-sm text-muted" onclick="showSetup()">Change database connection</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- bcryptjs for client-side password comparison -->
+  <script src="https://cdn.jsdelivr.net/npm/bcryptjs@2.4.3/dist/bcrypt.min.js"></script>
+  <script src="js/db.js"></script>
+  <script src="js/auth.js"></script>
+  <script src="js/api.js"></script>
+  <script src="js/utils.js"></script>
+  <script>
+    // If already logged in, go to dashboard
+    if (TursoDB.isConfigured() && Auth.isLoggedIn()) {
+      window.location.href = "dashboard.html";
+    }
+
+    // Show correct section
+    if (TursoDB.isConfigured()) {
+      document.getElementById("loginSection").style.display = "";
+    } else {
+      document.getElementById("setupSection").style.display = "";
+    }
+
+    function showSetup() {
+      document.getElementById("loginSection").style.display = "none";
+      document.getElementById("setupSection").style.display = "";
+    }
+
+    function togglePassword() {
+      const pwd = document.getElementById("password");
+      pwd.type = pwd.type === "password" ? "text" : "password";
+    }
+
+    async function handleSetup(e) {
+      e.preventDefault();
+      const url = document.getElementById("tursoUrl").value.trim();
+      const token = document.getElementById("tursoToken").value.trim();
+      const errEl = document.getElementById("setupError");
+      const btn = document.getElementById("setupBtn");
+
+      errEl.classList.add("d-none");
+
+      if (!url || !token) {
+        errEl.textContent = "Both fields are required.";
+        errEl.classList.remove("d-none");
+        return;
+      }
+
+      Loading.start(btn, "Connecting...");
+      try {
+        TursoDB.setCredentials(url, token);
+        const ok = await TursoDB.testConnection();
+        if (!ok) throw new Error("Connection failed.");
+        Toast.success("Database connected!");
+        document.getElementById("setupSection").style.display = "none";
+        document.getElementById("loginSection").style.display = "";
+      } catch (err) {
+        TursoDB.clearCredentials();
+        errEl.textContent = err.message || "Could not connect to database.";
+        errEl.classList.remove("d-none");
+      } finally {
+        Loading.stop(btn);
+      }
+    }
+
+    async function handleLogin(e) {
+      e.preventDefault();
+      const emailEl = document.getElementById("email");
+      const pwdEl = document.getElementById("password");
+      const errEl = document.getElementById("loginError");
+      const btn = document.getElementById("loginBtn");
+
+      errEl.classList.add("d-none");
+
+      if (!emailEl.value || !pwdEl.value) {
+        errEl.textContent = "Email and password are required.";
+        errEl.classList.remove("d-none");
+        return;
+      }
+
+      Loading.start(btn, "Signing in...");
+      try {
+        await Auth.login(emailEl.value.trim(), pwdEl.value);
+        window.location.href = "dashboard.html";
+      } catch (err) {
+        errEl.textContent = err.message || "Login failed.";
+        errEl.classList.remove("d-none");
+      } finally {
+        Loading.stop(btn);
+      }
+    }
+  </script>
+</body>
+</html>

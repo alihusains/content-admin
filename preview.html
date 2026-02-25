@@ -1,0 +1,146 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Preview — Content Admin</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Amiri:wght@400;700&display=swap" rel="stylesheet">
+  <link href="css/styles.css" rel="stylesheet">
+  <style>
+    .preview-wrapper { min-height:100vh; background:var(--surface-alt); }
+    .preview-toolbar { background:var(--surface); border-bottom:1px solid var(--border); padding:0.75rem 1.5rem; display:flex; align-items:center; justify-content:space-between; position:sticky; top:0; z-index:10; }
+    .phone-frame { width:375px; margin:2rem auto; background:var(--surface); border-radius:24px; box-shadow:var(--shadow-lg); overflow:hidden; border:8px solid #1e293b; }
+    .phone-notch { height:28px; background:#1e293b; border-radius:0 0 16px 16px; width:50%; margin:0 auto; }
+    .phone-content { min-height:600px; }
+    .phone-content .app-header { background:var(--primary); color:white; padding:1rem 1.25rem; font-weight:600; font-size:1.125rem; }
+    .phone-content .app-body { padding:1rem 1.25rem; }
+    .content-item { margin-bottom:1.25rem; }
+    .content-item .field-label { font-size:0.6875rem; text-transform:uppercase; letter-spacing:0.5px; color:var(--text-muted); margin-bottom:0.25rem; font-weight:600; }
+    .content-item .field-value { font-size:0.9375rem; line-height:1.6; color:var(--text); }
+    .content-item .field-value.arabic { direction:rtl; text-align:right; font-family:'Amiri',serif; font-size:1.25rem; line-height:2; }
+    .content-item .field-value.urdu { direction:rtl; text-align:right; font-family:'Amiri',serif; font-size:1.125rem; line-height:1.8; }
+    .media-section { margin-top:1rem; padding:0.75rem; background:var(--surface-alt); border-radius:var(--radius); border:1px solid var(--border); }
+    .media-link { display:flex; align-items:center; gap:0.5rem; padding:0.5rem 0; color:var(--primary); text-decoration:none; font-size:0.8125rem; }
+    .media-link+.media-link { border-top:1px solid var(--border); }
+    .child-list { list-style:none; padding:0; margin:1rem 0 0; }
+    .child-list li { padding:0.75rem 1rem; background:var(--surface-alt); border:1px solid var(--border); border-radius:6px; margin-bottom:0.5rem; cursor:pointer; transition:var(--transition); display:flex; align-items:center; justify-content:space-between; }
+    .child-list li:hover { border-color:var(--primary); background:var(--primary-light); }
+    .nav-back { display:flex; align-items:center; gap:0.5rem; color:var(--primary); cursor:pointer; font-size:0.875rem; font-weight:500; margin-bottom:1rem; }
+    @media(max-width:480px) { .phone-frame { width:100%; border-radius:0; border:none; margin:0; } }
+  </style>
+</head>
+<body>
+  <div class="preview-wrapper">
+    <div class="preview-toolbar">
+      <div class="d-flex align-items-center gap-3">
+        <a href="editor.html" class="btn btn-sm btn-outline-secondary">Back to Editor</a>
+        <h6 class="mb-0" style="font-size:0.9375rem;">Preview</h6>
+      </div>
+      <div class="d-flex align-items-center gap-2">
+        <label class="form-label-custom mb-0 me-1" style="font-size:0.8125rem;">Language:</label>
+        <select id="langSelect" class="form-select form-select-sm" style="width:auto;" onchange="changeLanguage()">
+          <option value="en">English</option><option value="gu">Gujarati</option>
+          <option value="ar">Arabic</option><option value="ur">Urdu</option>
+        </select>
+      </div>
+    </div>
+
+    <div class="phone-frame">
+      <div class="phone-notch"></div>
+      <div class="phone-content">
+        <div class="app-header" id="previewHeader">Content Preview</div>
+        <div class="app-body" id="previewBody">
+          <div class="text-center text-muted py-5"><div class="spinner-border spinner-border-sm"></div><br><small>Loading...</small></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/bcryptjs@2.4.3/dist/bcrypt.min.js"></script>
+  <script src="js/db.js"></script>
+  <script src="js/auth.js"></script>
+  <script src="js/api.js"></script>
+  <script src="js/utils.js"></script>
+  <script>
+    if (!Auth.requireLogin()) throw new Error("Not authenticated");
+
+    const params = new URLSearchParams(window.location.search);
+    let contentId = params.get("content_id");
+    let lang = params.get("lang") || "en";
+    document.getElementById("langSelect").value = lang;
+    const navHistory = [];
+
+    if (contentId) loadPreview(contentId, lang);
+    else loadRootPreview();
+
+    function changeLanguage() { lang = document.getElementById("langSelect").value; contentId ? loadPreview(contentId, lang) : loadRootPreview(); }
+    function esc(str) { if (!str) return ""; const d = document.createElement("div"); d.textContent = str; return d.innerHTML; }
+    function langName(c) { return { en: "English", gu: "Gujarati", ar: "Arabic", ur: "Urdu" }[c] || c; }
+
+    async function loadRootPreview() {
+      try {
+        const data = await API.getTree("with-language", lang);
+        const roots = (data.rows || []).filter((r) => r.parent_id == null).sort((a, b) => (a.sequence || 0) - (b.sequence || 0));
+        document.getElementById("previewHeader").textContent = "Content Library";
+        if (roots.length === 0) { document.getElementById("previewBody").innerHTML = '<p class="text-center text-muted py-4">No content.</p>'; return; }
+        let h = '<ul class="child-list">';
+        for (const item of roots) {
+          h += `<li onclick="navigateTo(${item.id})"><div><div style="font-weight:600;">${esc(item.title || item.type || "Item #" + item.id)}</div><div style="font-size:0.75rem;color:var(--text-muted);">${item.type}</div></div><svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><polyline points="9 18 15 12 9 6"/></svg></li>`;
+        }
+        h += "</ul>";
+        document.getElementById("previewBody").innerHTML = h;
+      } catch { document.getElementById("previewBody").innerHTML = '<p class="text-center text-danger py-4">Failed to load.</p>'; }
+    }
+
+    async function loadPreview(id, language) {
+      contentId = id;
+      try {
+        const [treeData, transData] = await Promise.all([API.getTree("with-language", language), API.getTranslations(id)]);
+        const allRows = treeData.rows || [];
+        const item = allRows.find((r) => Number(r.id) === Number(id));
+        const trans = (transData.translations || {})[language] || {};
+        if (!item) { document.getElementById("previewBody").innerHTML = '<p class="text-center text-muted py-4">Not found.</p>'; return; }
+
+        const isRtl = language === "ar" || language === "ur";
+        const textCls = language === "ar" ? "arabic" : language === "ur" ? "urdu" : "";
+        document.getElementById("previewHeader").textContent = trans.title || item.title || item.type || `Item #${item.id}`;
+
+        let h = "";
+        if (navHistory.length > 0 || item.parent_id) h += `<div class="nav-back" onclick="goBack()"><svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M19 12H5M12 19l-7-7 7-7"/></svg> Back</div>`;
+        if (trans.title) h += `<div class="content-item"><div class="field-label">Title</div><div class="field-value ${textCls}" ${isRtl ? 'dir="rtl"' : ''}>${esc(trans.title)}</div></div>`;
+        if (trans.original_text) h += `<div class="content-item"><div class="field-label">Original Text</div><div class="field-value ${textCls}" ${isRtl ? 'dir="rtl"' : ''} style="${item.css || ''}">${esc(trans.original_text)}</div></div>`;
+        if (trans.translation) h += `<div class="content-item"><div class="field-label">Translation</div><div class="field-value">${esc(trans.translation)}</div></div>`;
+        if (trans.transliteration) h += `<div class="content-item"><div class="field-label">Transliteration</div><div class="field-value" style="font-style:italic;color:var(--text-muted);">${esc(trans.transliteration)}</div></div>`;
+
+        if (item.audio_url || item.video_url || item.duas_url) {
+          h += '<div class="media-section">';
+          if (item.audio_url) h += `<a href="${esc(item.audio_url)}" target="_blank" class="media-link">Play Audio</a>`;
+          if (item.video_url) h += `<a href="${esc(item.video_url)}" target="_blank" class="media-link">Watch Video</a>`;
+          if (item.duas_url) h += `<a href="${esc(item.duas_url)}" target="_blank" class="media-link">Open Duas</a>`;
+          h += "</div>";
+        }
+
+        const children = allRows.filter((c) => Number(c.parent_id) === Number(id)).sort((a, b) => (a.sequence || 0) - (b.sequence || 0));
+        if (children.length > 0) {
+          h += '<ul class="child-list">';
+          for (const child of children) {
+            const ct = child.title || child.type || `Item #${child.id}`;
+            const cc = allRows.filter((c) => Number(c.parent_id) === Number(child.id)).length;
+            h += `<li onclick="navigateTo(${child.id})"><div><div style="font-weight:600;" ${isRtl ? 'dir="rtl"' : ''}>${esc(ct)}</div><div style="font-size:0.75rem;color:var(--text-muted);">${child.type}${cc > 0 ? ` (${cc})` : ""}</div></div><svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><polyline points="9 18 15 12 9 6"/></svg></li>`;
+          }
+          h += "</ul>";
+        }
+
+        if (!trans.title && !trans.original_text && !trans.translation && children.length === 0) {
+          h += `<p class="text-center text-muted py-3">No ${langName(language)} translation available.</p>`;
+        }
+        document.getElementById("previewBody").innerHTML = h;
+      } catch { document.getElementById("previewBody").innerHTML = '<p class="text-center text-danger py-4">Failed to load.</p>'; }
+    }
+
+    function navigateTo(id) { if (contentId) navHistory.push(contentId); loadPreview(id, lang); }
+    function goBack() { const prev = navHistory.pop(); prev ? loadPreview(prev, lang) : (contentId = null, loadRootPreview()); }
+  </script>
+</body>
+</html>
