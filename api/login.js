@@ -1,25 +1,59 @@
+/**
+ * POST /api/login
+ * Authenticates user with email/password and returns a JWT token.
+ */
 import bcrypt from "bcryptjs";
-import jwt from "jsonwebtoken";
-import { db } from "../lib/db";
+import { query } from "../lib/db.js";
+import { signToken, handleCors } from "../lib/auth.js";
 
 export default async function handler(req, res) {
-  const { email, password } = req.body;
+  if (handleCors(req, res)) return;
 
-  const result = await db.execute({
-    sql: "SELECT * FROM users WHERE email = ?",
-    args: [email],
-  });
+  if (req.method !== "POST") {
+    return res.status(405).json({ error: "Method not allowed" });
+  }
 
-  const user = result.rows[0];
-  if (!user) return res.status(401).json({ error: "Invalid" });
+  try {
+    const { email, password } = req.body || {};
 
-  const valid = await bcrypt.compare(password, user.password_hash);
-  if (!valid) return res.status(401).json({ error: "Invalid" });
+    // Validate input
+    if (!email || !password) {
+      return res.status(400).json({ error: "Email and password are required." });
+    }
 
-  const token = jwt.sign(
-    { id: user.id, role: user.role },
-    process.env.JWT_SECRET
-  );
+    // Find user
+    const rows = await query("SELECT * FROM users WHERE email = ?", [
+      email.toLowerCase().trim(),
+    ]);
+    const user = rows[0];
 
-  res.json({ token });
+    if (!user) {
+      return res.status(401).json({ error: "Invalid email or password." });
+    }
+
+    // Verify password
+    const valid = await bcrypt.compare(password, user.password_hash);
+    if (!valid) {
+      return res.status(401).json({ error: "Invalid email or password." });
+    }
+
+    // Generate token
+    const token = signToken({
+      id: Number(user.id),
+      email: user.email,
+      role: user.role,
+    });
+
+    res.json({
+      token,
+      user: {
+        id: Number(user.id),
+        email: user.email,
+        role: user.role,
+      },
+    });
+  } catch (err) {
+    console.error("Login error:", err);
+    res.status(500).json({ error: "Login failed. Please try again." });
+  }
 }

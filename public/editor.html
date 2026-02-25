@@ -1,0 +1,904 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Editor — Content Admin</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link href="/css/styles.css" rel="stylesheet">
+</head>
+<body>
+  <!-- Navbar -->
+  <nav class="app-navbar">
+    <a href="/dashboard.html" class="brand">
+      <div class="brand-icon">CA</div>
+      Content Admin
+    </a>
+    <div class="nav-actions">
+      <a href="/dashboard.html" class="nav-link-custom">Dashboard</a>
+      <a href="/editor.html" class="nav-link-custom active">Editor</a>
+      <button onclick="API.logout()" class="btn btn-sm btn-outline-secondary">Logout</button>
+    </div>
+  </nav>
+
+  <!-- Editor Layout -->
+  <div class="editor-layout">
+    <!-- Left: Tree Sidebar -->
+    <div class="tree-sidebar">
+      <div class="tree-header">
+        <h5>
+          Content Tree
+          <button class="btn btn-sm btn-primary" onclick="showAddRootModal()" title="Add root item">
+            <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+              <path d="M12 5v14M5 12h14"/>
+            </svg>
+          </button>
+        </h5>
+        <div class="tree-search">
+          <svg class="search-icon" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+            <circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/>
+          </svg>
+          <input type="text" id="treeSearch" placeholder="Search content..." oninput="filterTree(this.value)">
+        </div>
+      </div>
+      <div class="tree-content" id="treeContainer">
+        <div class="text-center text-muted py-4">
+          <div class="spinner-border spinner-border-sm"></div><br>
+          <small>Loading tree...</small>
+        </div>
+      </div>
+    </div>
+
+    <!-- Right: Editor Pane -->
+    <div class="editor-pane">
+      <!-- Empty State -->
+      <div class="editor-empty" id="editorEmpty">
+        <svg width="64" height="64" fill="none" stroke="currentColor" stroke-width="1" viewBox="0 0 24 24">
+          <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
+          <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
+        </svg>
+        <h5>Select a content item</h5>
+        <p class="text-muted" style="max-width:300px">Click on any item in the tree to view and edit its details and translations.</p>
+      </div>
+
+      <!-- Editor Content (hidden until item selected) -->
+      <div id="editorContent" style="display:none;">
+        <!-- Header with breadcrumb -->
+        <div class="editor-header">
+          <div class="editor-breadcrumb" id="editorBreadcrumb"></div>
+          <div class="d-flex gap-2">
+            <button class="btn btn-sm btn-outline-primary" onclick="openPreview()" title="Preview">
+              <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/>
+                <circle cx="12" cy="12" r="3"/>
+              </svg>
+              Preview
+            </button>
+            <button class="btn btn-sm btn-outline-danger" onclick="deleteSelectedContent()" title="Delete">
+              <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                <path d="M3 6h18M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>
+              </svg>
+              Delete
+            </button>
+          </div>
+        </div>
+
+        <!-- Tabs -->
+        <div class="editor-tabs" id="editorTabs">
+          <button class="editor-tab active" data-tab="structure" onclick="switchTab('structure')">Structure</button>
+          <button class="editor-tab" data-tab="en" onclick="switchTab('en')">English</button>
+          <button class="editor-tab" data-tab="gu" onclick="switchTab('gu')">Gujarati</button>
+          <button class="editor-tab" data-tab="ar" onclick="switchTab('ar')">Arabic</button>
+          <button class="editor-tab" data-tab="ur" onclick="switchTab('ur')">Urdu</button>
+        </div>
+
+        <!-- Tab Content -->
+        <div class="editor-body">
+          <!-- Structure Tab -->
+          <div class="editor-tab-content active" id="tab-structure">
+            <div class="form-section">
+              <h6>Content Properties</h6>
+              <div class="row g-3">
+                <div class="col-md-6">
+                  <label class="form-label-custom">Content Type</label>
+                  <select id="fieldType" class="form-select">
+                    <option value="category">Category</option>
+                    <option value="content">Content</option>
+                    <option value="section">Section</option>
+                    <option value="item">Item</option>
+                  </select>
+                </div>
+                <div class="col-md-6">
+                  <label class="form-label-custom">Parent</label>
+                  <select id="fieldParent" class="form-select">
+                    <option value="">Root (no parent)</option>
+                  </select>
+                </div>
+                <div class="col-md-6">
+                  <label class="form-label-custom">Sequence (display order)</label>
+                  <input type="number" id="fieldSequence" class="form-control" min="0" value="0">
+                </div>
+                <div class="col-md-6">
+                  <label class="form-label-custom">Content ID</label>
+                  <input type="text" id="fieldId" class="form-control" readonly disabled style="background:#f8fafc;">
+                </div>
+              </div>
+            </div>
+
+            <div class="form-section">
+              <h6>Media & Styling</h6>
+              <div class="row g-3">
+                <div class="col-md-6">
+                  <label class="form-label-custom">Audio URL</label>
+                  <input type="url" id="fieldAudioUrl" class="form-control" placeholder="https://...">
+                </div>
+                <div class="col-md-6">
+                  <label class="form-label-custom">Video URL</label>
+                  <input type="url" id="fieldVideoUrl" class="form-control" placeholder="https://...">
+                </div>
+                <div class="col-md-6">
+                  <label class="form-label-custom">Duas URL</label>
+                  <input type="url" id="fieldDuasUrl" class="form-control" placeholder="https://...">
+                </div>
+                <div class="col-md-6">
+                  <label class="form-label-custom">Custom CSS</label>
+                  <input type="text" id="fieldCss" class="form-control" placeholder="e.g., font-size:18px;">
+                </div>
+              </div>
+            </div>
+
+            <button class="btn btn-primary" id="saveStructureBtn" onclick="saveStructure()">
+              <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" class="me-1">
+                <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/>
+                <polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/>
+              </svg>
+              Save Structure
+            </button>
+          </div>
+
+          <!-- Language Tabs (generated dynamically) -->
+          <div class="editor-tab-content" id="tab-en">
+            <div class="form-section">
+              <h6>English Translation</h6>
+              <div class="row g-3">
+                <div class="col-12">
+                  <label class="form-label-custom">Title</label>
+                  <input type="text" id="en-title" class="form-control" placeholder="Enter title...">
+                </div>
+                <div class="col-12">
+                  <label class="form-label-custom">Original Text</label>
+                  <textarea id="en-original_text" class="form-control" rows="4" placeholder="Original text content..."></textarea>
+                </div>
+                <div class="col-12">
+                  <label class="form-label-custom">Translation</label>
+                  <textarea id="en-translation" class="form-control" rows="4" placeholder="Translation text..."></textarea>
+                </div>
+                <div class="col-12">
+                  <label class="form-label-custom">Transliteration</label>
+                  <textarea id="en-transliteration" class="form-control" rows="3" placeholder="Transliteration text..."></textarea>
+                </div>
+                <div class="col-12">
+                  <label class="form-label-custom">Search Text</label>
+                  <input type="text" id="en-search_text" class="form-control" placeholder="Keywords for search...">
+                </div>
+              </div>
+            </div>
+            <button class="btn btn-primary" onclick="saveTranslation('en')">
+              <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" class="me-1">
+                <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/>
+                <polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/>
+              </svg>
+              Save English
+            </button>
+          </div>
+
+          <div class="editor-tab-content" id="tab-gu">
+            <div class="form-section">
+              <h6>Gujarati Translation</h6>
+              <div class="row g-3">
+                <div class="col-12">
+                  <label class="form-label-custom">Title</label>
+                  <input type="text" id="gu-title" class="form-control" placeholder="શીર્ષક દાખલ કરો...">
+                </div>
+                <div class="col-12">
+                  <label class="form-label-custom">Original Text</label>
+                  <textarea id="gu-original_text" class="form-control" rows="4" placeholder="મૂળ ટેક્સ્ટ..."></textarea>
+                </div>
+                <div class="col-12">
+                  <label class="form-label-custom">Translation</label>
+                  <textarea id="gu-translation" class="form-control" rows="4" placeholder="અનુવાદ ટેક્સ્ટ..."></textarea>
+                </div>
+                <div class="col-12">
+                  <label class="form-label-custom">Transliteration</label>
+                  <textarea id="gu-transliteration" class="form-control" rows="3" placeholder="Transliteration..."></textarea>
+                </div>
+                <div class="col-12">
+                  <label class="form-label-custom">Search Text</label>
+                  <input type="text" id="gu-search_text" class="form-control" placeholder="શોધ ટેક્સ્ટ...">
+                </div>
+              </div>
+            </div>
+            <button class="btn btn-primary" onclick="saveTranslation('gu')">
+              <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" class="me-1">
+                <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/>
+                <polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/>
+              </svg>
+              Save Gujarati
+            </button>
+          </div>
+
+          <div class="editor-tab-content" id="tab-ar">
+            <div class="form-section">
+              <h6>Arabic Translation</h6>
+              <div class="row g-3">
+                <div class="col-12">
+                  <label class="form-label-custom">Title</label>
+                  <input type="text" id="ar-title" class="form-control rtl-text" placeholder="...أدخل العنوان" dir="rtl">
+                </div>
+                <div class="col-12">
+                  <label class="form-label-custom">Original Text</label>
+                  <textarea id="ar-original_text" class="form-control rtl-text" rows="4" placeholder="...النص الأصلي" dir="rtl"></textarea>
+                </div>
+                <div class="col-12">
+                  <label class="form-label-custom">Translation</label>
+                  <textarea id="ar-translation" class="form-control rtl-text" rows="4" placeholder="...نص الترجمة" dir="rtl"></textarea>
+                </div>
+                <div class="col-12">
+                  <label class="form-label-custom">Transliteration</label>
+                  <textarea id="ar-transliteration" class="form-control" rows="3" placeholder="Transliteration..."></textarea>
+                </div>
+                <div class="col-12">
+                  <label class="form-label-custom">Search Text</label>
+                  <input type="text" id="ar-search_text" class="form-control rtl-text" placeholder="...نص البحث" dir="rtl">
+                </div>
+              </div>
+            </div>
+            <button class="btn btn-primary" onclick="saveTranslation('ar')">
+              <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" class="me-1">
+                <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/>
+                <polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/>
+              </svg>
+              Save Arabic
+            </button>
+          </div>
+
+          <div class="editor-tab-content" id="tab-ur">
+            <div class="form-section">
+              <h6>Urdu Translation</h6>
+              <div class="row g-3">
+                <div class="col-12">
+                  <label class="form-label-custom">Title</label>
+                  <input type="text" id="ur-title" class="form-control rtl-text" placeholder="...عنوان درج کریں" dir="rtl">
+                </div>
+                <div class="col-12">
+                  <label class="form-label-custom">Original Text</label>
+                  <textarea id="ur-original_text" class="form-control rtl-text" rows="4" placeholder="...اصل متن" dir="rtl"></textarea>
+                </div>
+                <div class="col-12">
+                  <label class="form-label-custom">Translation</label>
+                  <textarea id="ur-translation" class="form-control rtl-text" rows="4" placeholder="...ترجمہ متن" dir="rtl"></textarea>
+                </div>
+                <div class="col-12">
+                  <label class="form-label-custom">Transliteration</label>
+                  <textarea id="ur-transliteration" class="form-control" rows="3" placeholder="Transliteration..."></textarea>
+                </div>
+                <div class="col-12">
+                  <label class="form-label-custom">Search Text</label>
+                  <input type="text" id="ur-search_text" class="form-control rtl-text" placeholder="...تلاش متن" dir="rtl">
+                </div>
+              </div>
+            </div>
+            <button class="btn btn-primary" onclick="saveTranslation('ur')">
+              <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" class="me-1">
+                <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/>
+                <polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/>
+              </svg>
+              Save Urdu
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Add Content Modal -->
+  <div class="modal fade" id="addContentModal" tabindex="-1">
+    <div class="modal-dialog modal-dialog-centered">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h5 class="modal-title" id="addModalTitle">Add Content</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+        </div>
+        <div class="modal-body">
+          <div class="mb-3">
+            <label class="form-label-custom">Content Type</label>
+            <select id="addType" class="form-select">
+              <option value="category">Category</option>
+              <option value="content">Content</option>
+              <option value="section">Section</option>
+              <option value="item">Item</option>
+            </select>
+          </div>
+          <input type="hidden" id="addParentId" value="">
+        </div>
+        <div class="modal-footer">
+          <button class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+          <button class="btn btn-primary" id="addContentBtn" onclick="handleAddContent()">
+            <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" class="me-1">
+              <path d="M12 5v14M5 12h14"/>
+            </svg>
+            Add
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+  <script src="/js/api.js"></script>
+  <script src="/js/utils.js"></script>
+  <script>
+    /* ═══════════════════════════════════════════════════
+       Editor State & Initialization
+       ═══════════════════════════════════════════════════ */
+
+    if (!requireAuth()) throw new Error("Not authenticated");
+
+    // Global state
+    let allContent = [];        // Flat list from API
+    let selectedId = null;      // Currently selected content ID
+    let expandedNodes = new Set(); // Expanded node IDs
+    let currentTranslations = {}; // Loaded translations for selected item
+    let draggedId = null;       // Drag-and-drop source
+
+    // Initial load
+    loadTree();
+
+    /* ═══════════════════════════════════════════════════
+       Tree Operations
+       ═══════════════════════════════════════════════════ */
+
+    async function loadTree() {
+      try {
+        const data = await API.getTree();
+        allContent = data.rows || [];
+        renderTree();
+        populateParentDropdown();
+      } catch (err) {
+        Toast.error("Failed to load content tree.");
+        console.error(err);
+      }
+    }
+
+    function renderTree() {
+      const container = document.getElementById("treeContainer");
+      const searchTerm = document.getElementById("treeSearch")?.value?.toLowerCase() || "";
+
+      // Build tree structure from flat list
+      const rootItems = allContent.filter((c) => c.parent_id === null || c.parent_id === undefined);
+      rootItems.sort((a, b) => (a.sequence || 0) - (b.sequence || 0));
+
+      if (rootItems.length === 0 && allContent.length === 0) {
+        container.innerHTML = `
+          <div class="empty-state">
+            <svg width="40" height="40" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24">
+              <path d="M12 5v14M5 12h14"/>
+            </svg>
+            <h5 style="font-size:0.9375rem;">No content yet</h5>
+            <p style="font-size:0.8125rem;">Click the + button above to add your first content item.</p>
+          </div>`;
+        return;
+      }
+
+      let html = "";
+      for (const item of rootItems) {
+        html += renderTreeNode(item, searchTerm, 0);
+      }
+      container.innerHTML = html;
+    }
+
+    function renderTreeNode(item, searchTerm, depth) {
+      const children = allContent
+        .filter((c) => Number(c.parent_id) === Number(item.id))
+        .sort((a, b) => (a.sequence || 0) - (b.sequence || 0));
+      const hasChildren = children.length > 0;
+      const isExpanded = expandedNodes.has(Number(item.id));
+      const isSelected = selectedId === Number(item.id);
+
+      // Get display label — prefer English title, fallback to type + id
+      const label = item._label || `${item.type || "item"} #${item.id}`;
+
+      // Filter: if searching, show node only if it matches or has matching descendants
+      if (searchTerm) {
+        const matches = label.toLowerCase().includes(searchTerm) ||
+          (item.type || "").toLowerCase().includes(searchTerm) ||
+          String(item.id).includes(searchTerm);
+        const childrenMatch = children.some((c) => nodeMatchesSearch(c, searchTerm));
+        if (!matches && !childrenMatch) return "";
+      }
+
+      const typeClass = `type-${item.type || "default"}`;
+
+      let html = `<div class="tree-node" data-id="${item.id}">`;
+      html += `<div class="tree-node-row ${isSelected ? "selected" : ""}"
+                    onclick="selectNode(${item.id})"
+                    draggable="true"
+                    ondragstart="onDragStart(event, ${item.id})"
+                    ondragover="onDragOver(event)"
+                    ondrop="onDrop(event, ${item.id})"
+                    data-id="${item.id}">`;
+
+      // Toggle button
+      html += `<button class="tree-toggle ${isExpanded ? "expanded" : ""} ${!hasChildren ? "no-children" : ""}"
+                       onclick="event.stopPropagation(); toggleNode(${item.id})">
+                 <svg width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                   <polyline points="9 18 15 12 9 6"/>
+                 </svg>
+               </button>`;
+
+      // Icon based on type
+      const icons = {
+        category: '<svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>',
+        content: '<svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>',
+        section: '<svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M4 6h16M4 10h16M4 14h16M4 18h16"/></svg>',
+        item: '<svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4M12 8h.01"/></svg>',
+      };
+      html += `<span class="tree-node-icon">${icons[item.type] || icons.item}</span>`;
+
+      // Label
+      html += `<span class="tree-node-label">${escapeHtml(label)}</span>`;
+
+      // Type badge
+      html += `<span class="tree-node-badge ${typeClass}">${item.type || "item"}</span>`;
+
+      // Actions
+      html += `<div class="tree-node-actions">
+        <button onclick="event.stopPropagation(); showAddChildModal(${item.id})" title="Add child">
+          <svg width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg>
+        </button>
+        <button class="btn-delete" onclick="event.stopPropagation(); deleteNode(${item.id})" title="Delete">
+          <svg width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M3 6h18M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
+        </button>
+      </div>`;
+
+      html += `</div>`; // end tree-node-row
+
+      // Children
+      if (hasChildren && isExpanded) {
+        html += `<div class="tree-children">`;
+        for (const child of children) {
+          html += renderTreeNode(child, searchTerm, depth + 1);
+        }
+        html += `</div>`;
+      }
+
+      html += `</div>`; // end tree-node
+      return html;
+    }
+
+    function nodeMatchesSearch(node, searchTerm) {
+      const label = node._label || `${node.type || "item"} #${node.id}`;
+      if (label.toLowerCase().includes(searchTerm)) return true;
+      if ((node.type || "").toLowerCase().includes(searchTerm)) return true;
+      if (String(node.id).includes(searchTerm)) return true;
+      const children = allContent.filter((c) => Number(c.parent_id) === Number(node.id));
+      return children.some((c) => nodeMatchesSearch(c, searchTerm));
+    }
+
+    function toggleNode(id) {
+      if (expandedNodes.has(id)) {
+        expandedNodes.delete(id);
+      } else {
+        expandedNodes.add(id);
+      }
+      renderTree();
+    }
+
+    function filterTree(searchTerm) {
+      // When searching, auto-expand all nodes
+      if (searchTerm) {
+        allContent.forEach((c) => expandedNodes.add(Number(c.id)));
+      }
+      renderTree();
+    }
+
+    function populateParentDropdown() {
+      const select = document.getElementById("fieldParent");
+      select.innerHTML = '<option value="">Root (no parent)</option>';
+      for (const item of allContent) {
+        const label = item._label || `${item.type} #${item.id}`;
+        select.innerHTML += `<option value="${item.id}">${"—".repeat(getDepth(item))} ${escapeHtml(label)}</option>`;
+      }
+    }
+
+    function getDepth(item) {
+      let depth = 0;
+      let current = item;
+      while (current.parent_id) {
+        depth++;
+        current = allContent.find((c) => Number(c.id) === Number(current.parent_id));
+        if (!current || depth > 20) break;
+      }
+      return depth;
+    }
+
+    function getBreadcrumb(id) {
+      const parts = [];
+      let current = allContent.find((c) => Number(c.id) === Number(id));
+      while (current) {
+        parts.unshift(current._label || `${current.type} #${current.id}`);
+        if (!current.parent_id) break;
+        current = allContent.find((c) => Number(c.id) === Number(current.parent_id));
+      }
+      return parts;
+    }
+
+    /* ═══════════════════════════════════════════════════
+       Node Selection & Editor
+       ═══════════════════════════════════════════════════ */
+
+    async function selectNode(id) {
+      selectedId = Number(id);
+      renderTree(); // Re-render to highlight selection
+
+      const item = allContent.find((c) => Number(c.id) === selectedId);
+      if (!item) return;
+
+      // Show editor, hide empty state
+      document.getElementById("editorEmpty").style.display = "none";
+      document.getElementById("editorContent").style.display = "";
+
+      // Update breadcrumb
+      const crumbs = getBreadcrumb(id);
+      const breadcrumbEl = document.getElementById("editorBreadcrumb");
+      breadcrumbEl.innerHTML = crumbs.map((c, i) =>
+        i === crumbs.length - 1
+          ? `<span>${escapeHtml(c)}</span>`
+          : `${escapeHtml(c)} <svg width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><polyline points="9 18 15 12 9 6"/></svg>`
+      ).join(" ");
+
+      // Populate structure fields
+      document.getElementById("fieldId").value = item.id;
+      document.getElementById("fieldType").value = item.type || "category";
+      document.getElementById("fieldParent").value = item.parent_id || "";
+      document.getElementById("fieldSequence").value = item.sequence || 0;
+      document.getElementById("fieldAudioUrl").value = item.audio_url || "";
+      document.getElementById("fieldVideoUrl").value = item.video_url || "";
+      document.getElementById("fieldDuasUrl").value = item.duas_url || "";
+      document.getElementById("fieldCss").value = item.css || "";
+
+      // Load translations
+      await loadTranslations(id);
+
+      // Switch to structure tab
+      switchTab("structure");
+    }
+
+    async function loadTranslations(contentId) {
+      try {
+        const data = await API.getTranslations(contentId);
+        currentTranslations = data.translations || {};
+
+        // Populate each language tab
+        const languages = ["en", "gu", "ar", "ur"];
+        const fields = ["title", "transliteration", "translation", "original_text", "search_text"];
+
+        for (const lang of languages) {
+          const trans = currentTranslations[lang] || {};
+          for (const field of fields) {
+            const el = document.getElementById(`${lang}-${field}`);
+            if (el) el.value = trans[field] || "";
+          }
+        }
+      } catch (err) {
+        console.error("Failed to load translations:", err);
+        Toast.error("Failed to load translations.");
+      }
+    }
+
+    /* ═══════════════════════════════════════════════════
+       Tab Switching
+       ═══════════════════════════════════════════════════ */
+
+    function switchTab(tabId) {
+      // Update tab buttons
+      document.querySelectorAll(".editor-tab").forEach((t) => {
+        t.classList.toggle("active", t.dataset.tab === tabId);
+      });
+      // Update tab content
+      document.querySelectorAll(".editor-tab-content").forEach((tc) => {
+        tc.classList.toggle("active", tc.id === `tab-${tabId}`);
+      });
+    }
+
+    /* ═══════════════════════════════════════════════════
+       Save Operations
+       ═══════════════════════════════════════════════════ */
+
+    async function saveStructure() {
+      if (!selectedId) return;
+
+      const btn = document.getElementById("saveStructureBtn");
+      Loading.start(btn, "Saving...");
+
+      try {
+        const data = {
+          id: selectedId,
+          type: document.getElementById("fieldType").value,
+          parent_id: document.getElementById("fieldParent").value || null,
+          sequence: parseInt(document.getElementById("fieldSequence").value) || 0,
+          audio_url: document.getElementById("fieldAudioUrl").value || null,
+          video_url: document.getElementById("fieldVideoUrl").value || null,
+          duas_url: document.getElementById("fieldDuasUrl").value || null,
+          css: document.getElementById("fieldCss").value || null,
+        };
+
+        await API.updateContent(data);
+        Toast.success("Structure saved successfully!");
+        await loadTree(); // Refresh tree
+        selectNode(selectedId); // Re-select to refresh
+      } catch (err) {
+        Toast.error(err.message || "Failed to save structure.");
+      } finally {
+        Loading.stop(btn);
+      }
+    }
+
+    async function saveTranslation(lang) {
+      if (!selectedId) return;
+
+      const btn = event.target.closest("button");
+      Loading.start(btn, "Saving...");
+
+      try {
+        const data = {
+          content_id: selectedId,
+          language_code: lang,
+          title: document.getElementById(`${lang}-title`).value,
+          transliteration: document.getElementById(`${lang}-transliteration`).value,
+          translation: document.getElementById(`${lang}-translation`).value,
+          original_text: document.getElementById(`${lang}-original_text`).value,
+          search_text: document.getElementById(`${lang}-search_text`).value,
+        };
+
+        await API.saveTranslation(data);
+        Toast.success(`${getLanguageName(lang)} translation saved!`);
+
+        // Update the tree label if we saved English title
+        if (lang === "en" && data.title) {
+          const item = allContent.find((c) => Number(c.id) === selectedId);
+          if (item) item._label = data.title;
+          renderTree();
+        }
+      } catch (err) {
+        Toast.error(err.message || "Failed to save translation.");
+      } finally {
+        Loading.stop(btn);
+      }
+    }
+
+    function getLanguageName(code) {
+      const names = { en: "English", gu: "Gujarati", ar: "Arabic", ur: "Urdu" };
+      return names[code] || code.toUpperCase();
+    }
+
+    /* ═══════════════════════════════════════════════════
+       Add / Delete Content
+       ═══════════════════════════════════════════════════ */
+
+    function showAddRootModal() {
+      document.getElementById("addModalTitle").textContent = "Add Root Content";
+      document.getElementById("addParentId").value = "";
+      document.getElementById("addType").value = "category";
+      new bootstrap.Modal(document.getElementById("addContentModal")).show();
+    }
+
+    function showAddChildModal(parentId) {
+      const parent = allContent.find((c) => Number(c.id) === parentId);
+      document.getElementById("addModalTitle").textContent = `Add Child to ${parent?._label || "#" + parentId}`;
+      document.getElementById("addParentId").value = parentId;
+      document.getElementById("addType").value = "content";
+      new bootstrap.Modal(document.getElementById("addContentModal")).show();
+    }
+
+    async function handleAddContent() {
+      const btn = document.getElementById("addContentBtn");
+      const parentId = document.getElementById("addParentId").value || null;
+      const type = document.getElementById("addType").value;
+
+      Loading.start(btn, "Adding...");
+      try {
+        const result = await API.createContent({
+          parent_id: parentId ? Number(parentId) : null,
+          type,
+        });
+
+        Toast.success("Content created!");
+        bootstrap.Modal.getInstance(document.getElementById("addContentModal"))?.hide();
+
+        // Expand parent and reload
+        if (parentId) expandedNodes.add(Number(parentId));
+        await loadTree();
+
+        // Auto-select the new item
+        if (result.id) {
+          selectNode(result.id);
+        }
+      } catch (err) {
+        Toast.error(err.message || "Failed to create content.");
+      } finally {
+        Loading.stop(btn);
+      }
+    }
+
+    async function deleteNode(id) {
+      const item = allContent.find((c) => Number(c.id) === Number(id));
+      const label = item?._label || `#${id}`;
+
+      const confirmed = await confirmAction(
+        "Delete Content",
+        `Are you sure you want to delete <strong>"${escapeHtml(label)}"</strong> and all its children? This action uses soft-delete and can be recovered.`,
+        "Delete",
+        "btn-danger"
+      );
+
+      if (!confirmed) return;
+
+      try {
+        await API.deleteContent(id);
+        Toast.success(`"${label}" deleted.`);
+
+        // Clear selection if deleted item was selected
+        if (selectedId === Number(id)) {
+          selectedId = null;
+          document.getElementById("editorEmpty").style.display = "";
+          document.getElementById("editorContent").style.display = "none";
+        }
+
+        await loadTree();
+      } catch (err) {
+        Toast.error(err.message || "Delete failed.");
+      }
+    }
+
+    async function deleteSelectedContent() {
+      if (!selectedId) return;
+      await deleteNode(selectedId);
+    }
+
+    /* ═══════════════════════════════════════════════════
+       Drag and Drop Reorder
+       ═══════════════════════════════════════════════════ */
+
+    function onDragStart(e, id) {
+      draggedId = id;
+      e.dataTransfer.effectAllowed = "move";
+      e.target.closest(".tree-node-row")?.classList.add("dragging");
+    }
+
+    function onDragOver(e) {
+      e.preventDefault();
+      e.dataTransfer.dropEffect = "move";
+      const row = e.target.closest(".tree-node-row");
+      // Remove all existing drag-over highlights
+      document.querySelectorAll(".drag-over").forEach((el) => el.classList.remove("drag-over"));
+      if (row) row.classList.add("drag-over");
+    }
+
+    async function onDrop(e, targetId) {
+      e.preventDefault();
+      document.querySelectorAll(".dragging, .drag-over").forEach((el) => {
+        el.classList.remove("dragging", "drag-over");
+      });
+
+      if (!draggedId || draggedId === targetId) return;
+
+      const draggedItem = allContent.find((c) => Number(c.id) === draggedId);
+      const targetItem = allContent.find((c) => Number(c.id) === targetId);
+
+      if (!draggedItem || !targetItem) return;
+
+      // If they share the same parent, reorder within siblings
+      if (String(draggedItem.parent_id) === String(targetItem.parent_id)) {
+        const parentId = draggedItem.parent_id;
+        const siblings = allContent
+          .filter((c) =>
+            String(c.parent_id) === String(parentId) ||
+            (parentId === null && (c.parent_id === null || c.parent_id === undefined))
+          )
+          .sort((a, b) => (a.sequence || 0) - (b.sequence || 0));
+
+        const orderedIds = siblings.map((s) => Number(s.id));
+        // Move dragged to target position
+        const fromIdx = orderedIds.indexOf(draggedId);
+        const toIdx = orderedIds.indexOf(targetId);
+        orderedIds.splice(fromIdx, 1);
+        orderedIds.splice(toIdx, 0, draggedId);
+
+        try {
+          await API.reorderContent(parentId, orderedIds);
+          Toast.success("Reordered successfully!");
+          await loadTree();
+        } catch (err) {
+          Toast.error(err.message || "Reorder failed.");
+        }
+      } else {
+        // Move to different parent — update parent_id
+        try {
+          await API.updateContent({ id: draggedId, parent_id: targetId });
+          expandedNodes.add(targetId);
+          Toast.success("Moved successfully!");
+          await loadTree();
+        } catch (err) {
+          Toast.error(err.message || "Move failed.");
+        }
+      }
+
+      draggedId = null;
+    }
+
+    /* ═══════════════════════════════════════════════════
+       Preview
+       ═══════════════════════════════════════════════════ */
+
+    function openPreview() {
+      if (!selectedId) return;
+      const activeTab = document.querySelector(".editor-tab.active")?.dataset.tab;
+      const lang = activeTab && activeTab !== "structure" ? activeTab : "en";
+      window.open(`/preview.html?content_id=${selectedId}&lang=${lang}`, "_blank");
+    }
+
+    /* ═══════════════════════════════════════════════════
+       Load labels for tree (fetch English titles)
+       ═══════════════════════════════════════════════════ */
+
+    // After initial tree load, fetch labels from English translations
+    (async function loadLabels() {
+      try {
+        const data = await API.getTree("with-language", "en");
+        if (data.rows) {
+          // Create a map of labels
+          const labelMap = {};
+          for (const row of data.rows) {
+            if (row.title) labelMap[row.id] = row.title;
+          }
+          // Apply labels to allContent
+          for (const item of allContent) {
+            if (labelMap[item.id]) item._label = labelMap[item.id];
+          }
+          renderTree();
+          populateParentDropdown();
+        }
+      } catch (err) {
+        console.warn("Could not load labels:", err);
+      }
+    })();
+
+    /* ═══════════════════════════════════════════════════
+       Utilities
+       ═══════════════════════════════════════════════════ */
+
+    function escapeHtml(str) {
+      if (!str) return "";
+      const div = document.createElement("div");
+      div.textContent = str;
+      return div.innerHTML;
+    }
+
+    // Keyboard shortcut: Ctrl+S to save current tab
+    document.addEventListener("keydown", (e) => {
+      if ((e.ctrlKey || e.metaKey) && e.key === "s") {
+        e.preventDefault();
+        if (!selectedId) return;
+        const activeTab = document.querySelector(".editor-tab.active")?.dataset.tab;
+        if (activeTab === "structure") {
+          saveStructure();
+        } else if (activeTab) {
+          saveTranslation(activeTab);
+        }
+      }
+    });
+  </script>
+</body>
+</html>
